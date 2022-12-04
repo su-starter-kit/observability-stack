@@ -1,0 +1,49 @@
+receivers:
+  jaeger:
+    protocols:
+      thrift_http:
+        endpoint: "0.0.0.0:14278"
+
+  otlp:
+    protocols:
+      http:
+        endpoint: "0.0.0.0:14278"
+      grpc:
+        endpoint: "localhost:55677"
+  # dummy otlp receiver that is never used, but is required for the pipeline
+  otlp/spanmetrics:
+    protocols:
+      grpc:
+        endpoint: "localhost:12345"
+
+exporters:
+  otlp/spanmetrics:
+    endpoint: "localhost:55677"
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+  jaeger:
+    endpoint: "jaeger:14250" # Using docker-compose name of jaeger container
+    tls:
+      insecure: true
+
+processors:
+  batch:
+  spanmetrics:
+    metrics_exporter: prometheus
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [spanmetrics, batch]
+      exporters: [jaeger]
+    metrics/spanmetrics:  
+      # the receiver is also a dummy receiver required by the pipeline
+      receivers: [otlp/spanmetrics]
+      exporters: [otlp/spanmetrics]
+      # the exporter name must match the spanmetrics.metrics_exporter name
+    metrics:
+      receivers: [otlp, otlp/spanmetrics]
+      exporters: [prometheus]
